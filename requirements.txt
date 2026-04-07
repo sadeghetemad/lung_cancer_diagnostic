@@ -1,0 +1,11 @@
+boto3==1.34.34
+botocore==1.34.34 
+s3fs==2024.2.0
+aiobotocore==2.11.2
+matplotlib
+sagemaker
+sagemaker-experiments
+sagemaker-studio-image-build
+numpy
+pandas
+ipykernel
