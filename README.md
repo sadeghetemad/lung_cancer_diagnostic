@@ -6,136 +6,82 @@ An end-to-end **multimodal machine learning system** for lung cancer survival pr
 
 ## 🚀 Overview
 
-This project implements a **cloud-native multimodal pipeline** where all stages — from preprocessing to training and inference — are executed on **AWS SageMaker**.
+This project implements a **production-oriented multimodal ML pipeline** where all stages — from preprocessing to training and deployment — are modularized and integrated with AWS services.
 
 Three data modalities are used:
 
-- Clinical (CSV)
-- Genomic (text / structured)
-- CT Imaging (DICOM)
+- 🧬 Genomic Data  
+- 🏥 Clinical Data  
+- 🩻 CT Imaging Data  
 
-Each modality is transformed into features and stored in **SageMaker Feature Store**, enabling scalable training and querying via **Amazon Athena**.
+Each modality is processed independently and stored in **SageMaker Feature Store**, enabling scalable feature reuse and multimodal training.
 
 ---
 
-## ☁️ Fully AWS-Native Architecture
+## ☁️ AWS-Native Architecture
 
-Everything in this project runs on AWS:
+The entire pipeline is designed to run on AWS:
 
-- **SageMaker Processing Jobs** → heavy image pipelines  
-- **Docker (custom container)** → radiomics feature extraction  
-- **SageMaker Feature Store** → central feature storage  
+- **SageMaker Processing Jobs** → heavy CT image processing  
+- **Docker containers** → radiomics feature extraction  
+- **SageMaker Feature Store** → centralized feature storage  
+- **Amazon Athena** → feature querying & joins  
 - **SageMaker Training (XGBoost)** → model training  
 - **SageMaker Endpoint** → real-time inference  
-- **SageMaker Experiments** → experiment tracking  
-
-This is not a local ML project pretending to scale. It is **designed to scale from day one**.
 
 ---
 
-## 🧩 Pipeline Breakdown
+## 🧩 Pipeline Structure
 
-### 1. Clinical & Genomic Pipeline
+### 🔹 1. Genomic Pipeline
+- Reads genomic data from S3  
+- Selects relevant genes  
+- Cleans and transforms features  
+- Stores into Feature Store  
 
-- Processed inside SageMaker notebooks  
-- Cleaned and converted into tabular features  
-- Directly written to **Feature Store**
+### 🔹 2. Clinical Pipeline
+- Cleans structured EHR-like data  
+- Handles categorical encoding  
+- Removes leakage features  
+- Stores into Feature Store  
 
----
+### 🔹 3. Imaging Pipeline
+- DICOM → NIfTI conversion  
+- 3D reconstruction  
+- Radiomics feature extraction  
+- Runs via SageMaker Processing + Docker
+- Stores into Feature Store  
 
-### 2. Imaging Pipeline (Core Complexity)
-
-CT scans require a full processing pipeline:
-
-1. Load **DICOM CT images + tumor segmentation**
-2. Convert slices → **3D volume**
-3. Align CT with segmentation (registration)
-4. Extract **radiomics features**
-5. Convert to tabular format
-6. Store in **Image Feature Group**
-
----
-
-## ⚙️ Scalable Image Processing (Important Part)
-
-This part runs entirely on **SageMaker Processing Jobs** using Docker containers.
-
-- Each patient = one container job
-- Parallel processing across subjects
-- Heavy computation happens in the cloud, not your laptop
-
-Feature extraction logic lives in:
-
-```
-src/
-├── dcm2nifti_processing.py
-├── preprocess_images.py
-├── radiomics_utils.py
-```
-
-Dockerized via:
-
-```
-src/Dockerfile
-```
+### 🔹 4. Training & Deployment
+- Query multimodal features (Athena)  
+- Apply StandardScaler + PCA  
+- Train XGBoost  
+- Deploy to SageMaker Endpoint  
+- Evaluate model  
 
 ---
 
-## 🏗️ Feature Store Design
+## 🔄 End-to-End Flow
 
-Each modality has its own Feature Group:
-
-- Clinical Feature Group  
-- Genomic Feature Group  
-- Imaging Feature Group  
-
-All features are:
-
-- Stored centrally  
-- Queryable via Athena  
-- Joinable for training  
+Raw Data → Preprocessing → Feature Store → Athena Join → Training → PCA → Model → Endpoint → Prediction
 
 ---
 
-## 🤖 Model Training
+## ⚠️ Important Note
 
-- Features retrieved from Feature Store  
-- Combined into a unified dataset  
-- Trained using **SageMaker XGBoost**  
-
-Notebook:
-
-```
-4_train_test_model.ipynb
-```
-
----
-
-## ⚡ Inference
-
-- Model deployed to **SageMaker Endpoint**
-- Supports real-time predictions
+The model expects **scaled + PCA-transformed features** at inference time.
 
 ---
 
 ## 🧪 Project Structure
 
-```
 notebooks/
-├── 1_preprocess_genomic_data.ipynb
-├── 2_preprocess_clinical_data.ipynb
-├── 3_preprocess_imaging_data.ipynb
-├── 4_train_test_model.ipynb
+- preprocess notebooks
 
 src/
-├── dcm2nifti_processing.py
-├── preprocess_images.py
-├── radiomics_utils.py
-├── Dockerfile
-├── requirements.txt
-└── step_function.json
-
-```
+- preprocessing scripts
+- image_processing/
+- training script
 
 ---
 
@@ -152,9 +98,5 @@ src/
 
 ## 🎯 Goal
 
-To build a **scalable, production-grade AI system** for lung cancer detection by combining multiple medical data sources into a unified learning pipeline.
+Build a scalable multimodal AI system for lung cancer survival prediction.
 
----
-
-If you’re just stacking notebooks, this repo will feel like overkill.  
-If you actually care about building real ML systems, this is the blueprint.
