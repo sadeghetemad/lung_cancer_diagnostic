@@ -22,7 +22,6 @@ Each modality is transformed into features and stored in **SageMaker Feature Sto
 
 Everything in this project runs on AWS:
 
-- **SageMaker Studio Notebooks** → orchestration & preprocessing  
 - **SageMaker Processing Jobs** → heavy image pipelines  
 - **Docker (custom container)** → radiomics feature extraction  
 - **SageMaker Feature Store** → central feature storage  
@@ -136,7 +135,6 @@ src/
 ├── requirements.txt
 └── step_function.json
 
-main.py
 ```
 
 ---
