@@ -267,7 +267,7 @@ def save_trained_model(estimator):
 
     shutil.copy(src, dst)
 
-    print("Model saved as raw binary ✅")
+    print("Model saved as raw binary")
 
 # ==============================
 # MAIN PIPELINE
