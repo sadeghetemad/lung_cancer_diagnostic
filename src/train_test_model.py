@@ -5,7 +5,6 @@ import joblib
 import time
 import os
 import tarfile
-import shutil
 
 import sagemaker
 from sagemaker.session import Session
@@ -19,10 +18,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.metrics import accuracy_score, f1_score,  precision_score, recall_score, confusion_matrix
 
-# ==============================
-# CONFIG
-# ==============================
+import xgboost as xgb
 
+
+# CONFIG
 REGION = "eu-west-2"
 BUCKET = "multimodal-lung-cancer-811165582441-eu-west-2-an"
 PREFIX = "multi-model-health-ml"
@@ -33,10 +32,7 @@ CLINICAL_FG = "clinical-feature-group-05-18-48-56"
 IMAGING_FG = "ct-seg-image-imaging-feature-group"
 
 
-# ==============================
 # AWS SESSION
-# ==============================
-
 def create_session():
     boto_session = boto3.Session(region_name=REGION)
 
@@ -50,10 +46,7 @@ def create_session():
     )
 
 
-# ==============================
 # LOAD FEATURES (ATHENA JOIN)
-# ==============================
-
 def get_multimodal_features(session):
 
     genomic_fg = FeatureGroup(GENOMIC_FG, session)
@@ -96,10 +89,7 @@ def get_multimodal_features(session):
     return df
 
 
-# ==============================
 # PREPROCESS
-# ==============================
-
 def preprocess(df):
     X = df.drop("survivalstatus", axis=1)
     y = df["survivalstatus"]
@@ -109,10 +99,7 @@ def preprocess(df):
     return X, y
 
 
-# ==============================
 # SCALER + PCA
-# ==============================
-
 def apply_scale_pca(X_train, X_test):
 
     scaler = StandardScaler()
@@ -126,10 +113,7 @@ def apply_scale_pca(X_train, X_test):
     return scaler, pca, X_train_pca, X_test_pca
 
 
-# ==============================
 # SAVE ARTIFACTS
-# ==============================
-
 def save_artifact(obj, name):
     # create local folder
     os.makedirs("artifacts", exist_ok=True)
@@ -147,15 +131,12 @@ def save_artifact(obj, name):
     print(f"Saved {name} locally and uploaded to S3")
 
 
-# ==============================
 # TRAIN MODEL
-# ==============================
-
 def train_model(train_df, val_df):
 
     print("Starting training...")
 
-    container = retrieve("xgboost", region=REGION, version="1.2-1")
+    container = retrieve("xgboost", region=REGION, version="1.7-1")
 
     estimator = sagemaker.estimator.Estimator(
         container,
@@ -206,10 +187,7 @@ def train_model(train_df, val_df):
     return estimator
 
 
-# ==============================
 # DEPLOY
-# ==============================
-
 def deploy_model(estimator):
 
     endpoint_name = f"{PREFIX}-endpoint"
@@ -224,14 +202,12 @@ def deploy_model(estimator):
     return predictor, endpoint_name
 
 
-# ==============================
-# TEST MODEL
-# ==============================
 
+# TEST MODEL
 def evaluate(predictor, X_test, y_test):
 
     preds = predictor.predict(X_test).decode("utf-8")
-    preds = [1 if float(p) > 0.5 else 0 for p in preds.split(",")]
+    preds = [1 if float(p.strip()) > 0.5 else 0 for p in preds.splitlines()]
 
     print("Accuracy:", accuracy_score(y_test, preds))
     print("F1:", f1_score(y_test, preds))
@@ -240,12 +216,10 @@ def evaluate(predictor, X_test, y_test):
     print("Confusion Matrix:", confusion_matrix(y_test, preds))
 
 
-# ==============================
 # SAVE TRAINED MODEL
-# ==============================
 def save_trained_model(estimator):
 
-    print("Downloading trained model...")    
+    print("Downloading trained model from SageMaker...")
 
     s3 = boto3.client("s3", region_name=REGION)
 
@@ -259,20 +233,37 @@ def save_trained_model(estimator):
     tar_path = "artifacts/model.tar.gz"
     s3.download_file(bucket, key, tar_path)
 
+    print("Extracting model...")
+
+    # extract
     with tarfile.open(tar_path, "r:gz") as tar:
         tar.extractall(path="artifacts")
 
-    src = "artifacts/xgboost-model"
-    dst = "artifacts/xgboost_model.bin"
+    print("Files:", os.listdir("artifacts"))
 
-    shutil.copy(src, dst)
+    model_path = "artifacts/xgboost-model"
 
-    print("Model saved as raw binary")
+    if not os.path.exists(model_path):
+        raise ValueError("❌ xgboost-model not found")
 
-# ==============================
+    print("Testing model load...")
+
+    booster = xgb.Booster()
+    booster.load_model(model_path)
+
+    print("Model loaded successfully (version OK)")
+
+
+    s3.upload_file(
+        model_path,
+        BUCKET,
+        f"{PREFIX}/artifacts/xgboost-model"
+    )
+
+    print("Model saved to S3 successfully")
+
+
 # MAIN PIPELINE
-# ==============================
-
 def run():
 
     print("Starting full pipeline...")
@@ -284,6 +275,9 @@ def run():
 
     # 2. preprocess
     X, y = preprocess(df)
+
+    schema = {col: str(X[col].dtype) for col in X.columns}
+    save_artifact(schema, "feature_schema.json")
 
     # save feature order
     feature_order = list(X.columns)
