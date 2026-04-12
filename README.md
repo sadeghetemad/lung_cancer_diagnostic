@@ -1,4 +1,4 @@
-# 🧠 Multimodal Lung Cancer Survival Prediction Pipeline
+# 🫁 Multimodal Lung Cancer Survival Prediction Pipeline
 
 An end-to-end **multimodal machine learning system** for lung cancer survival prediction using **clinical, genomic, and CT imaging data**, fully built and orchestrated on **AWS SageMaker**.
 
