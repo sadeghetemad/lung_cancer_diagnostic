@@ -31,6 +31,38 @@ GENOMIC_FG = "genomic-feature-group-05-19-10-59"
 CLINICAL_FG = "clinical-feature-group-05-18-48-56"
 IMAGING_FG = "ct-seg-image-imaging-feature-group"
 
+LEKEAGE_COLS = [
+    "timetodeathdays",
+
+    "recurrence_no",
+    "recurrence_yes",
+    "recurrencelocation_distant",
+    "recurrencelocation_local",
+    "recurrencelocation_regional",
+
+    "adjuvanttreatment_no",
+    "adjuvanttreatment_yes",
+    "chemotherapy_no",
+    "chemotherapy_yes",
+    "radiation_no",
+    "radiation_yes",
+
+    "pathologicaltstage_t1a",
+    "pathologicaltstage_t1b",
+    "pathologicaltstage_t2a",
+    "pathologicaltstage_t2b",
+    "pathologicaltstage_t3",
+    "pathologicaltstage_t4",
+    "pathologicaltstage_tis",
+
+    "pathologicalnstage_n0",
+    "pathologicalnstage_n1",
+    "pathologicalnstage_n2",
+
+    "pathologicalmstage_m0",
+    "pathologicalmstage_m1a",
+    "pathologicalmstage_m1b"
+]
 
 # AWS SESSION
 def create_session():
@@ -91,6 +123,14 @@ def get_multimodal_features(session):
 
 # PREPROCESS
 def preprocess(df):
+
+    print("Initial columns:", len(df.columns))
+
+    # drop lekeage columns 
+    df_clean = df.drop(columns=LEKEAGE_COLS , errors="ignore")
+
+    print("Columns after lekeage drop:", len(df_clean.columns))
+
     X = df.drop("survivalstatus", axis=1)
     y = df["survivalstatus"]
 
@@ -276,8 +316,11 @@ def run():
     # 2. preprocess
     X, y = preprocess(df)
 
+    feature_list = list(X.columns)
+    pd.DataFrame(feature_list, columns=["feature_name"]).to_csv("features.csv", index=False)
+
     schema = {col: str(X[col].dtype) for col in X.columns}
-    save_artifact(schema, "feature_schema.json")
+    save_artifact(schema, "feature_schema.json")    
 
     # save feature order
     feature_order = list(X.columns)
